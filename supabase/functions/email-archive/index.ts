@@ -88,7 +88,7 @@ Deno.serve(async (request: Request) => {
     if (!sourceKey) return json(request, 400, { error: "sourceKey is required." });
     const changes: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const field of ["category", "client_name", "assignee_name"] as const) {
-      if (field in input) changes[field] = String(input[field] ?? "").trim().slice(0, 160);
+      if (field in input) changes[field] = String(input[field] ?? "").trim().slice(0, field === "assignee_name" ? 4000 : 160);
     }
     if ("is_dismissed" in input) {
       if (typeof input.is_dismissed !== "boolean") return json(request, 400, { error: "is_dismissed must be boolean." });
@@ -102,6 +102,9 @@ Deno.serve(async (request: Request) => {
     const taskChanges: Record<string, unknown> = {};
     for (const [emailField, taskField] of [["category", "category"], ["client_name", "client_name"], ["assignee_name", "assignee_name"]] as const) {
       if (emailField in changes) taskChanges[taskField] = changes[emailField];
+    }
+    if ("assignee_name" in changes) {
+      taskChanges.assignee_names = String(changes.assignee_name || "").split(",").map(name => name.trim()).filter(Boolean).slice(0, 20);
     }
     if (Object.keys(taskChanges).length) {
       const { error: taskError } = await db().from("agenda_tasks")
@@ -183,7 +186,7 @@ Deno.serve(async (request: Request) => {
 
     if (request.method === "GET") {
       const { data, error } = await db().from("agenda_tasks")
-        .select("source_key,title,description,sender_name,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
+        .select("source_key,title,description,sender_name,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,assignee_names,created_at")
         .eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(1000);
       if (error) {
         console.error("Task query failed", error.message);
@@ -209,12 +212,19 @@ Deno.serve(async (request: Request) => {
         changes.title = title;
       }
       if ("description" in input) changes.description = String(input.description ?? "").trim().slice(0, 5000);
-      for (const [inputField, taskField, emailField] of [["category", "category", "category"], ["clientName", "client_name", "client_name"], ["assigneeName", "assignee_name", "assignee_name"]] as const) {
+      for (const [inputField, taskField, emailField] of [["category", "category", "category"], ["clientName", "client_name", "client_name"]] as const) {
         if (inputField in input) {
           const value = String(input[inputField] ?? "").trim().slice(0, 160);
           changes[taskField] = value;
           emailChanges[emailField] = value;
         }
+      }
+      if ("assigneeNames" in input || "assigneeName" in input) {
+        const rawNames = Array.isArray(input.assigneeNames) ? input.assigneeNames : (input.assigneeName ? [input.assigneeName] : []);
+        const names = [...new Set(rawNames.map(name => String(name ?? "").trim().slice(0, 160)).filter(Boolean))].slice(0, 20);
+        changes.assignee_names = names;
+        changes.assignee_name = names.join(", ");
+        emailChanges.assignee_name = names.join(", ");
       }
       if ("urgency" in input) {
         const urgency = String(input.urgency ?? "").trim();
@@ -244,6 +254,7 @@ Deno.serve(async (request: Request) => {
       const title = String(input.title ?? "").trim();
       const category = String(input.category ?? "").trim();
       const urgency = String(input.urgency ?? "Media").trim();
+      const assigneeNames = Array.isArray(input.assigneeNames) ? [...new Set(input.assigneeNames.map(name => String(name ?? "").trim().slice(0, 160)).filter(Boolean))].slice(0, 20) : (input.assigneeName ? [String(input.assigneeName).trim().slice(0, 160)] : []);
       if (!sourceKey || !title || !category || !["Alta", "Media", "Bassa"].includes(urgency)) {
         return json(request, 400, { error: "Required fields: sourceKey, title, category and valid urgency." });
       }
@@ -262,10 +273,11 @@ Deno.serve(async (request: Request) => {
         due_date: dueDate,
         due_label: String(input.dueLabel ?? ""),
         client_name: String(input.clientName ?? "").trim().slice(0, 160),
-        assignee_name: String(input.assigneeName ?? "").trim().slice(0, 160),
+        assignee_name: assigneeNames.join(", "),
+        assignee_names: assigneeNames,
         is_completed: false
       }, { onConflict: "owner_id,source_key" })
-        .select("source_key,title,description,sender_name,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
+        .select("source_key,title,description,sender_name,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,assignee_names,created_at")
         .single();
       if (error) {
         console.error("Task save failed", error.message);
