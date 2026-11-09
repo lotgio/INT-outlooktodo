@@ -7,9 +7,10 @@ La app legge le email archiviate in Supabase. Power Automate resta il collegamen
 Per questa versione occorre prima aggiornare il database e la funzione:
 
 1. Esegui in SQL Editor `202611090001_mail_classification.sql`.
-2. Esegui in SQL Editor anche `20261109_app_clients.sql`: importa nell’elenco protetto solo i nomi cliente distinti dello snapshot commesse dell’app INT-apptaskBI-clean. Non contiene commesse, descrizioni, ore o importi. Lo script è idempotente e si può rilanciare.
-3. Sostituisci il codice della Edge Function `email-archive` con `supabase/functions/email-archive/index.ts` nel repository GitHub e pubblica la funzione. La riclassificazione propagata alle attività collegate richiede questa versione aggiornata.
-4. In Edge Function Secrets verifica `APP_USER_EMAIL` con l’indirizzo autorizzato e `CORS_ORIGINS` con `https://lotgio.github.io` (aggiungi `http://localhost:8000` solo per test locale).
+2. Esegui in SQL Editor `202611100001_task_description.sql` per aggiungere la descrizione persistente alle attività.
+3. Esegui in SQL Editor anche `20261109_app_clients.sql`: importa nell’elenco protetto solo i nomi cliente distinti dello snapshot commesse dell’app INT-apptaskBI-clean. Non contiene commesse, descrizioni, ore o importi. Lo script è idempotente e si può rilanciare.
+4. Sostituisci il codice della Edge Function `email-archive` con `supabase/functions/email-archive/index.ts` nel repository GitHub e pubblica la funzione. La riclassificazione propagata alle attività collegate richiede questa versione aggiornata.
+5. In Edge Function Secrets verifica `APP_USER_EMAIL` con l’indirizzo autorizzato e `CORS_ORIGINS` con `https://lotgio.github.io` (aggiungi `http://localhost:8000` solo per test locale).
 
 La procedura dettagliata è in `outputs/outlook-supabase-bridge/README.md`. Non modificare il trigger Power Automate: continua a chiamare lo stesso endpoint e a usare `INGEST_SECRET`.
 
@@ -19,4 +20,4 @@ Il workflow `.github/workflows/pages.yml` pubblica a ogni push su `main`; richie
 
 ## Uso
 
-Accedi via link email. Da ogni email puoi creare un’attività, classificarla liberamente per categoria, cliente e assegnatario, oppure scartarla. Se riclassifichi un messaggio che ha già un’attività, la classificazione si aggiorna anche sull’attività collegata. Le email scartate si possono ripristinare dalla sezione **Scartate**. La sezione **Team** consente di gestire manualmente persone e gruppi. I nuovi clienti digitati in una classificazione vengono aggiunti all’elenco. Nella vista **Attività** puoi filtrare per testo, categoria, cliente, assegnatario, urgenza e stato; i KPI mostrano risultati filtrati, attività aperte, completate, in ritardo e con urgenza alta. Cerca email per oggetto, mittente, cliente o assegnatario.
+Accedi via link email. Da ogni email puoi creare un’attività con descrizione e classificarla liberamente per categoria, cliente e assegnatario, oppure scartarla. Se riclassifichi un messaggio che ha già un’attività, la classificazione si aggiorna anche sull’attività collegata. Le email scartate si possono ripristinare dalla sezione **Scartate**. La sezione **Team** consente di gestire manualmente persone e gruppi. I nuovi clienti digitati in una classificazione vengono aggiunti all’elenco. Nella vista **Attività** puoi filtrare per testo, categoria, cliente, assegnatario, urgenza e stato; i KPI grafici mostrano risultati filtrati, attività aperte, completate, in ritardo e con urgenza alta. La vista **Per scadenza** raggruppa le attività aperte in scadute, oggi, prossimi 7 giorni, più avanti e senza scadenza. Cerca email per oggetto, mittente, cliente o assegnatario.

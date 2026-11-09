@@ -154,7 +154,7 @@ Deno.serve(async (request: Request) => {
 
     if (request.method === "GET") {
       const { data, error } = await db().from("agenda_tasks")
-        .select("source_key,title,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
+        .select("source_key,title,description,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
         .eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(1000);
       if (error) {
         console.error("Task query failed", error.message);
@@ -191,6 +191,7 @@ Deno.serve(async (request: Request) => {
         owner_id: ownerId,
         source_key: sourceKey,
         title,
+        description: String(input.description ?? "").trim().slice(0, 5000),
         category,
         urgency,
         due_date: dueDate,
@@ -199,7 +200,7 @@ Deno.serve(async (request: Request) => {
         assignee_name: String(input.assigneeName ?? "").trim().slice(0, 160),
         is_completed: false
       }, { onConflict: "owner_id,source_key" })
-        .select("source_key,title,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
+        .select("source_key,title,description,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
         .single();
       if (error) {
         console.error("Task save failed", error.message);
