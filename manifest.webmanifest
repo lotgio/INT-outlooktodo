@@ -1,0 +1,21 @@
+{
+  "id": "/INT-outlooktodo/",
+  "name": "Outlook planner",
+  "short_name": "Outlook planner",
+  "description": "Organizza email e attività con il tuo calendario personale.",
+  "lang": "it-IT",
+  "start_url": "/INT-outlooktodo/",
+  "scope": "/INT-outlooktodo/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#6855df",
+  "background_color": "#f7f8fc",
+  "icons": [
+    {
+      "src": "/INT-outlooktodo/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
