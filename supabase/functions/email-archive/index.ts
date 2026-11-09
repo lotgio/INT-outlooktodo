@@ -148,13 +148,42 @@ Deno.serve(async (request: Request) => {
     }
   }
 
+  if (url.pathname.endsWith("/views")) {
+    const ownerId = await signedIn(request);
+    if (!ownerId) return json(request, 401, { error: "Accedi con l'account autorizzato dell'app." });
+    if (request.method === "GET") {
+      const { data, error } = await db().from("app_saved_views").select("name,config").eq("owner_id", ownerId).order("name", { ascending: true });
+      if (error) return json(request, 500, { error: "Could not load saved views." });
+      return json(request, 200, { value: data || [] });
+    }
+    if (request.method === "POST") {
+      let input: Record<string, unknown>;
+      try { input = await request.json(); } catch { return json(request, 400, { error: "Expected a JSON payload." }); }
+      const name = String(input.name ?? "").trim().slice(0, 80);
+      const config = input.config;
+      if (!name || !config || typeof config !== "object" || Array.isArray(config)) return json(request, 400, { error: "A view name and configuration object are required." });
+      const { data, error } = await db().from("app_saved_views").upsert({ owner_id: ownerId, name, config }, { onConflict: "owner_id,name" }).select("name,config").single();
+      if (error) return json(request, 500, { error: "Could not save this view." });
+      return json(request, 200, { view: data });
+    }
+    if (request.method === "DELETE") {
+      let input: Record<string, unknown>;
+      try { input = await request.json(); } catch { return json(request, 400, { error: "Expected a JSON payload." }); }
+      const name = String(input.name ?? "").trim();
+      if (!name) return json(request, 400, { error: "View name is required." });
+      const { error } = await db().from("app_saved_views").delete().eq("owner_id", ownerId).eq("name", name);
+      if (error) return json(request, 500, { error: "Could not remove this view." });
+      return json(request, 200, { deleted: true });
+    }
+  }
+
   if (url.pathname.endsWith("/tasks")) {
     const ownerId = await signedIn(request);
     if (!ownerId) return json(request, 401, { error: "Accedi con l'account autorizzato dell'app." });
 
     if (request.method === "GET") {
       const { data, error } = await db().from("agenda_tasks")
-        .select("source_key,title,description,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
+        .select("source_key,title,description,sender_name,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
         .eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(1000);
       if (error) {
         console.error("Task query failed", error.message);
@@ -227,6 +256,7 @@ Deno.serve(async (request: Request) => {
         source_key: sourceKey,
         title,
         description: String(input.description ?? "").trim().slice(0, 5000),
+        sender_name: String(input.senderName ?? "").trim().slice(0, 200),
         category,
         urgency,
         due_date: dueDate,
@@ -235,7 +265,7 @@ Deno.serve(async (request: Request) => {
         assignee_name: String(input.assigneeName ?? "").trim().slice(0, 160),
         is_completed: false
       }, { onConflict: "owner_id,source_key" })
-        .select("source_key,title,description,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
+        .select("source_key,title,description,sender_name,category,urgency,due_date,due_label,is_completed,client_name,assignee_name,created_at")
         .single();
       if (error) {
         console.error("Task save failed", error.message);
