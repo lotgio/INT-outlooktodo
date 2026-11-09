@@ -167,9 +167,44 @@ Deno.serve(async (request: Request) => {
       let input: Record<string, unknown>;
       try { input = await request.json(); } catch { return json(request, 400, { error: "Expected a JSON payload." }); }
       const sourceKey = String(input.sourceKey ?? "").trim();
-      if (!sourceKey || typeof input.isCompleted !== "boolean") return json(request, 400, { error: "Required fields: sourceKey and isCompleted." });
-      const { error } = await db().from("agenda_tasks").update({ is_completed: input.isCompleted, updated_at: new Date().toISOString() }).eq("owner_id", ownerId).eq("source_key", sourceKey);
+      if (!sourceKey) return json(request, 400, { error: "sourceKey is required." });
+      const changes: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      const emailChanges: Record<string, unknown> = {};
+      if ("isCompleted" in input) {
+        if (typeof input.isCompleted !== "boolean") return json(request, 400, { error: "isCompleted must be boolean." });
+        changes.is_completed = input.isCompleted;
+      }
+      if ("title" in input) {
+        const title = String(input.title ?? "").trim().slice(0, 500);
+        if (!title) return json(request, 400, { error: "title cannot be empty." });
+        changes.title = title;
+      }
+      if ("description" in input) changes.description = String(input.description ?? "").trim().slice(0, 5000);
+      for (const [inputField, taskField, emailField] of [["category", "category", "category"], ["clientName", "client_name", "client_name"], ["assigneeName", "assignee_name", "assignee_name"]] as const) {
+        if (inputField in input) {
+          const value = String(input[inputField] ?? "").trim().slice(0, 160);
+          changes[taskField] = value;
+          emailChanges[emailField] = value;
+        }
+      }
+      if ("urgency" in input) {
+        const urgency = String(input.urgency ?? "").trim();
+        if (!["Alta", "Media", "Bassa"].includes(urgency)) return json(request, 400, { error: "urgency must be Alta, Media or Bassa." });
+        changes.urgency = urgency;
+      }
+      if ("dueDate" in input) {
+        const dueDate = input.dueDate ? String(input.dueDate) : null;
+        if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return json(request, 400, { error: "dueDate must use YYYY-MM-DD format." });
+        changes.due_date = dueDate;
+      }
+      if ("dueLabel" in input) changes.due_label = String(input.dueLabel ?? "").trim().slice(0, 80);
+      if (Object.keys(changes).length === 1) return json(request, 400, { error: "No task fields to update." });
+      const { error } = await db().from("agenda_tasks").update(changes).eq("owner_id", ownerId).eq("source_key", sourceKey);
       if (error) return json(request, 500, { error: "Could not update task." });
+      if (Object.keys(emailChanges).length) {
+        const { error: emailError } = await db().from("emails").update({ ...emailChanges, updated_at: new Date().toISOString() }).eq("source_key", sourceKey);
+        if (emailError) return json(request, 500, { error: "Task saved, but linked email classification could not be updated." });
+      }
       return json(request, 200, { updated: true });
     }
 
