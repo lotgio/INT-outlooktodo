@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    if: vars.ENTRA_CLIENT_ID != '' && vars.MICROSOFT_TENANT_ID != '' && vars.ARCHIVE_API_ENDPOINT != '' && vars.ARCHIVE_API_SCOPE != '' && vars.SUPABASE_ANON_KEY != ''
+    if: vars.ARCHIVE_API_ENDPOINT != '' && vars.SUPABASE_ANON_KEY != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,13 +23,8 @@ jobs:
         uses: actions/checkout@v6
       - name: Prepare app configuration
         env:
-          ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
-          TENANT_ID: ${{ vars.MICROSOFT_TENANT_ID }}
           API_ENDPOINT: ${{ vars.ARCHIVE_API_ENDPOINT }}
-          API_SCOPE: ${{ vars.ARCHIVE_API_SCOPE }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
-          REPOSITORY_NAME: ${{ github.event.repository.name }}
         run: |
           python - <<'PY'
           import json
@@ -37,11 +32,7 @@ jobs:
           from pathlib import Path
 
           values = {
-              "clientId": os.environ["ENTRA_CLIENT_ID"],
-              "tenantId": os.environ["TENANT_ID"],
-              "redirectUri": f"https://{os.environ['REPOSITORY_OWNER']}.github.io/{os.environ['REPOSITORY_NAME']}/",
               "apiEndpoint": os.environ["API_ENDPOINT"],
-              "apiScope": os.environ["API_SCOPE"],
               "supabaseAnonKey": os.environ["SUPABASE_ANON_KEY"],
           }
           missing = [key for key, value in values.items() if not value]
