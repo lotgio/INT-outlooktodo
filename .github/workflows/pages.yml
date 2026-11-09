@@ -1,4 +1,4 @@
-name: Publish Posta in agenda
+name: Publish Outlook planner
 
 on:
   push:
